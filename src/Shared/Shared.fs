@@ -2,22 +2,28 @@ namespace Shared
 
 open System
 
-type Todo =
-    { Id : Guid
-      Description : string }
+type CovidStat =
+    { Day : DateTime
+      NbHospitalisation : int
+      NewHospitalisation : int
+      NbReanimation : int
+      NewReanimation : int
+      NbReturn : int
+      NewReturn : int
+      NbDeath : int
+      NewDeath : int }
 
-module Todo =
-    let isValid (description: string) =
-        String.IsNullOrWhiteSpace description |> not
+// module CovidStat =
+//     let isValid (description: string) =
+//         String.IsNullOrWhiteSpace description |> not
 
-    let create (description: string) =
-        { Id = Guid.NewGuid()
-          Description = description }
+//     let create (description: string) =
+//         { Id = Guid.NewGuid()
+//           Description = description }
 
 module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
 
-type ITodosApi =
-    { getTodos : unit -> Async<Todo list>
-      addTodo : Todo -> Async<Todo> }
+type ICovidStatApi =
+    { GetData : string * string -> Async<CovidStat list> }

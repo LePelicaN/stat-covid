@@ -1,37 +1,76 @@
 module Server
 
+open System
+
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open Saturn
 
 open Shared
 
-type Storage () =
-    let todos = ResizeArray<_>()
+open FSharp.Data
 
-    member __.GetTodos () =
-        List.ofSeq todos
+open CsvModel
 
-    member __.AddTodo (todo: Todo) =
-        if Todo.isValid todo.Description then
-            todos.Add todo
-            Ok ()
-        else Error "Invalid todo"
+// type Storage () =
+    //let todos = ResizeArray<_>()
 
-let storage = Storage()
+    // member __.GetTodos () =
+    //     List.ofSeq todos
 
-storage.AddTodo(Todo.create "Create new SAFE project") |> ignore
-storage.AddTodo(Todo.create "Write your app") |> ignore
-storage.AddTodo(Todo.create "Ship it !!!") |> ignore
+    // member __.AddTodo (todo: Todo) =
+    //     if Todo.isValid todo.Description then
+    //         todos.Add todo
+    //         Ok ()
+    //     else Error "Invalid todo"
 
-let todosApi =
-    { getTodos = fun () -> async { return storage.GetTodos() }
-      addTodo =
-        fun todo -> async {
-            match storage.AddTodo todo with
-            | Ok () -> return todo
-            | Error e -> return failwith e
-        } }
+// let storage = Storage()
+
+// storage.AddTodo(Todo.create "Create new SAFE project") |> ignore
+// storage.AddTodo(Todo.create "Write your app") |> ignore
+// storage.AddTodo(Todo.create "Ship it !!!") |> ignore
+
+
+
+let todosApi = {
+  GetData = fun (county:string, sexe:string) -> async {
+    try
+      let address = "https://www.data.gouv.fr/fr/datasets/r/63352e38-d353-4b54-bfd1-f1b3ee1cabd7"
+      let csvData = CsvFile.Load(address, ";")
+      eprintfn "csvData: %A" csvData
+      eprintfn "csvData.Headers: %A" csvData.Headers
+
+      let firstRow = csvData.Rows |> Seq.head
+      eprintfn "1st row: %A" firstRow
+      eprintfn "1st row dep: %A" (firstRow.GetColumn "dep")
+      eprintfn "1st row jour: %A" (firstRow.GetColumn "jour")
+
+      return csvData.Rows
+      |> Seq.filter (fun row ->
+        (row.GetColumn CsvModel.countyLabel) = county &&
+          (row.GetColumn CsvModel.sexLabel) = sexe
+      )
+      |> Seq.map (fun row -> 
+        {
+          Day = DateTime.ParseExact((row.GetColumn CsvModel.dateLabel), CsvModel.dateFormats, null, System.Globalization.DateTimeStyles.None)
+          NbHospitalisation = int (row.GetColumn CsvModel.nbHostitalisationLabel)
+          NewHospitalisation = 0
+          NbReanimation = int (row.GetColumn CsvModel.nbReanimationLabel)
+          NewReanimation = 0
+          NbReturn = int (row.GetColumn CsvModel.nbReturnLabel)
+          NewReturn = 0
+          NbDeath = int (row.GetColumn CsvModel.nbDeathLabel)
+          NewDeath = 0
+        }
+      )
+      |> Seq.toList
+
+    with
+      | ex ->
+        eprintfn "Exception: %A" ex
+        return []
+  }
+}
 
 let webApp =
     Remoting.createApi()

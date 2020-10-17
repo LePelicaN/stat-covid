@@ -5,39 +5,39 @@ open Fable.Remoting.Client
 open Shared
 
 type Model =
-    { Todos: Todo list
+    { CovidStats: CovidStat list
       Input: string }
 
 type Msg =
-    | GotTodos of Todo list
+    | GotCovidStat of CovidStat list
     | SetInput of string
     | AddTodo
-    | AddedTodo of Todo
 
-let todosApi =
+let covidStatApi =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.buildProxy<ITodosApi>
+    |> Remoting.buildProxy<ICovidStatApi>
 
 let init(): Model * Cmd<Msg> =
     let model =
-        { Todos = []
+        { CovidStats = []
           Input = "" }
-    let cmd = Cmd.OfAsync.perform todosApi.getTodos () GotTodos
+    let cmd = Cmd.OfAsync.perform covidStatApi.GetData ("69", "0") GotCovidStat
     model, cmd
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
-    | GotTodos todos ->
-        { model with Todos = todos }, Cmd.none
+    | GotCovidStat stats ->
+        { model with CovidStats = stats }, Cmd.none
     | SetInput value ->
         { model with Input = value }, Cmd.none
     | AddTodo ->
-        let todo = Todo.create model.Input
-        let cmd = Cmd.OfAsync.perform todosApi.addTodo todo AddedTodo
-        { model with Input = "" }, cmd
-    | AddedTodo todo ->
-        { model with Todos = model.Todos @ [ todo ] }, Cmd.none
+        //let todo = Todo.create model.Input
+        //let cmd = Cmd.OfAsync.perform todosApi.addTodo todo AddedTodo
+        // { model with Input = "" }, cmd
+        { model with Input = "" }, Cmd.none
+    // | AddedTodo todo ->
+    //     { model with Todos = model.Todos @ [ todo ] }, Cmd.none
 
 open Fable.React
 open Fable.React.Props
@@ -60,8 +60,8 @@ let containerBox (model : Model) (dispatch : Msg -> unit) =
     Box.box' [ ] [
         Content.content [ ] [
             Content.Ol.ol [ ] [
-                for todo in model.Todos do
-                    li [ ] [ str todo.Description ]
+                // for todo in model.Todos do
+                //     li [ ] [ str todo.Description ]
             ]
         ]
         Field.div [ Field.IsGrouped ] [
@@ -74,13 +74,33 @@ let containerBox (model : Model) (dispatch : Msg -> unit) =
             Control.p [ ] [
                 Button.a [
                     Button.Color IsPrimary
-                    Button.Disabled (Todo.isValid model.Input |> not)
+                    // Button.Disabled (Todo.isValid model.Input |> not)
                     Button.OnClick (fun _ -> dispatch AddTodo)
                 ] [
                     str "Add"
                 ]
             ]
         ]
+    ]
+
+let dataPart (model : Model) =
+  Table.table [ Table.IsHoverable ]
+    [ thead [ ]
+        [ tr [ ]
+            [ th [ ] [ str "Date" ]
+              th [ ] [ str "Hospitalisation" ]
+              th [ ] [ str "Reanimation" ]
+              th [ ] [ str "Return" ]
+              th [ ] [ str "Death" ] ] ]
+      tbody [ ] [
+          for stat in model.CovidStats do
+            tr [ ]
+              [ td [ ] [ str (stat.Day.ToString("dd/MM/yyyy")) ]
+                td [ ] [ str (string stat.NbHospitalisation) ]
+                td [ ] [ str (string stat.NbReanimation) ]
+                td [ ] [ str (string stat.NbReturn) ]
+                td [ ] [ str (string stat.NbDeath) ] ]
+      ]
     ]
 
 let view (model : Model) (dispatch : Msg -> unit) =
@@ -106,8 +126,9 @@ let view (model : Model) (dispatch : Msg -> unit) =
                     Column.Width (Screen.All, Column.Is6)
                     Column.Offset (Screen.All, Column.Is3)
                 ] [
-                    Heading.p [ Heading.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [ str "stat_covid" ]
+                    Heading.p [ Heading.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [ str "Statistic COVID" ]
                     containerBox model dispatch
+                    dataPart model
                 ]
             ]
         ]

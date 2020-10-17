@@ -5,7 +5,14 @@
   * `dotnet new SAFE`
   * `dotnet tool restore`
   * `dotnet fake build --target run`
-* Follow https://safe-stack.github.io/docs/legacy-template-heroku/
+  * Test on http://localhost:8080/
+<!-- * Heroku
+  * Install Heroku-cli
+  * `heroku login`
+  * `heroku create`
+  * `git push heroku master` -->
+* FSharp.Data :
+  * `dotnet paket install`
 
 # SAFE Template
 This template can be used to generate a full-stack web application using the [SAFE Stack](https://safe-stack.github.io/). It was created using the dotnet [SAFE Template](https://safe-stack.github.io/docs/template-overview/). If you want to learn more about the template why not start with the [quick start](https://safe-stack.github.io/docs/quickstart/) guide?
