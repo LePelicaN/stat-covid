@@ -30,8 +30,6 @@ open CsvModel
 // storage.AddTodo(Todo.create "Write your app") |> ignore
 // storage.AddTodo(Todo.create "Ship it !!!") |> ignore
 
-
-
 let todosApi = {
   GetData = fun (county:string, sexe:string) -> async {
     try
@@ -44,6 +42,26 @@ let todosApi = {
       eprintfn "1st row: %A" firstRow
       eprintfn "1st row dep: %A" (firstRow.GetColumn "dep")
       eprintfn "1st row jour: %A" (firstRow.GetColumn "jour")
+
+
+      let addNew (updatedPrevious:CovidStat list) (currentDay:CovidStat) =
+        let updated =
+          match updatedPrevious with
+            | h::t ->
+              { currentDay with
+                  NewHospitalisation = currentDay.NbHospitalisation - h.NbHospitalisation
+                  NewReanimation = currentDay.NbReanimation - h.NbReanimation
+                  NewReturn = currentDay.NbReturn - h.NbReturn
+                  NewDeath = currentDay.NewDeath - h.NewDeath
+              }
+            | _ ->
+              { currentDay with
+                  NewHospitalisation = currentDay.NbHospitalisation
+                  NewReanimation = currentDay.NbReanimation
+                  NewReturn = currentDay.NbReturn
+                  NewDeath = currentDay.NewDeath
+              }
+        updated :: updatedPrevious
 
       return csvData.Rows
       |> Seq.filter (fun row ->
@@ -63,7 +81,8 @@ let todosApi = {
           NewDeath = 0
         }
       )
-      |> Seq.toList
+      |> Seq.fold addNew []
+      |> List.rev
 
     with
       | ex ->
