@@ -4,41 +4,74 @@ open Elmish
 open Fable.Import.Chartjs
 open Fable.Remoting.Client
 open Shared
+open Shared.CovidStatHelper
+
+type DisplayChoice =
+  | Nb
+  | New
+  | Acceleration
+
+let NbLabel = "Number"
+let NewLabel = "New"
+let AccelerationLabel = "Acceleration"
+
+let parseDisplayChoice = function
+ | x when x = NbLabel -> Nb
+ | x when x = NewLabel -> New
+ | x when x = AccelerationLabel -> Acceleration
+ | _ -> raise (System.ArgumentException("Invalid display choice!"))
 
 type Model =
     { CovidStats: CovidStat list
-      Input: string }
+      County: string
+      Sex: string
+      NewWindow: int
+      AccelerationWindow: int
+      TableDisplayChoice: DisplayChoice }
 
 type Msg =
     | GotCovidStat of CovidStat list
-    | SetInput of string
-    | AddTodo
+    | SetCounty of string
+    | SetSex of string
+    | SetNewWindow of string
+    | SetAccelerationWindow of string
+    | SetTableDisplayChoice of string
+    | Refresh
 
 let covidStatApi =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<ICovidStatApi>
 
+let synchroCmd model =
+  Cmd.OfAsync.perform covidStatApi.GetData (model.County, model.Sex, model.NewWindow, model.AccelerationWindow) GotCovidStat
+
 let init(): Model * Cmd<Msg> =
     let model =
         { CovidStats = []
-          Input = "" }
-    let cmd = Cmd.OfAsync.perform covidStatApi.GetData ("69", "0") GotCovidStat
-    model, cmd
+          County = "69"
+          Sex = "0"
+          NewWindow = 7
+          AccelerationWindow = 3
+          TableDisplayChoice = Nb }
+    model, synchroCmd model
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
     | GotCovidStat stats ->
-        { model with CovidStats = stats }, Cmd.none
-    | SetInput value ->
-        { model with Input = value }, Cmd.none
-    | AddTodo ->
-        //let todo = Todo.create model.Input
-        //let cmd = Cmd.OfAsync.perform todosApi.addTodo todo AddedTodo
-        // { model with Input = "" }, cmd
-        { model with Input = "" }, Cmd.none
-    // | AddedTodo todo ->
-    //     { model with Todos = model.Todos @ [ todo ] }, Cmd.none
+      { model with CovidStats = stats }, Cmd.none
+    | SetCounty value ->
+      { model with County = value }, Cmd.none
+    | SetSex value ->
+      { model with Sex = value }, Cmd.none
+    | SetNewWindow value ->
+      { model with NewWindow = int(value) }, Cmd.none
+    | SetAccelerationWindow value ->
+      { model with AccelerationWindow = int(value) }, Cmd.none
+    | SetTableDisplayChoice value ->
+      { model with TableDisplayChoice = parseDisplayChoice(value) }, Cmd.none
+    | Refresh ->
+      model, synchroCmd model
 
 open Fable.React
 open Fable.React.Props
@@ -59,30 +92,66 @@ let navBrand =
 
 let containerBox (model : Model) (dispatch : Msg -> unit) =
     Box.box' [ ] [
-        Content.content [ ] [
-            Content.Ol.ol [ ] [
-                // for todo in model.Todos do
-                //     li [ ] [ str todo.Description ]
-            ]
-        ]
-        Field.div [ Field.IsGrouped ] [
-            Control.p [ Control.IsExpanded ] [
+        Field.div [ ] [
+            Label.label [ ]
+                  [ str "County : " ]
+            Control.div [ ] [
                 Input.text [
-                  Input.Value model.Input
-                  Input.Placeholder "What needs to be done?"
-                  Input.OnChange (fun x -> SetInput x.Value |> dispatch) ]
+                  Input.Value model.County
+                  Input.Placeholder "County to analyse"
+                  Input.OnChange (fun x -> SetCounty x.Value |> dispatch) ]
+            ]
+            Label.label [ ]
+                  [ str "Sex : " ]
+            Select.select [ ]
+                [ select
+                    [ DefaultValue "0"
+                      OnChange (fun x -> SetSex x.Value |> dispatch) ]
+                    [ option [ Value "0" ] [ str "Both" ]
+                      option [ Value "1"] [ str "Men" ]
+                      option [ Value "2"] [ str "Women" ] ]
+                 ]
+            Label.label [ ]
+                  [ str "New window : " ]
+            Control.div [ ] [
+                Input.number [
+                  Input.Value <| model.NewWindow.ToString()
+                  Input.Placeholder "Window to compute new"
+                  Input.OnChange (fun x -> SetNewWindow x.Value |> dispatch) ]
+            ]
+            Label.label [ ]
+                  [ str "Acceleration window : " ]
+            Control.div [ ] [
+                Input.number [
+                  Input.Value <| model.AccelerationWindow.ToString()
+                  Input.Placeholder "Window to compute acceleration"
+                  Input.OnChange (fun x -> SetAccelerationWindow x.Value |> dispatch) ]
             ]
             Control.p [ ] [
                 Button.a [
                     Button.Color IsPrimary
                     // Button.Disabled (Todo.isValid model.Input |> not)
-                    Button.OnClick (fun _ -> dispatch AddTodo)
+                    Button.OnClick (fun _ -> dispatch Refresh)
                 ] [
-                    str "Add"
+                    str "Refresh"
                 ]
             ]
         ]
     ]
+
+let datarepresentationchoice (model : Model) (dispatch : Msg -> unit) =
+  Box.box' [ ] [
+    Field.div [ ] [
+      Select.select [ ]
+            [ select
+                [ DefaultValue "Number"
+                  OnChange (fun x -> SetTableDisplayChoice x.Value |> dispatch) ]
+                [ option [ Value NbLabel ] [ str "Number" ]
+                  option [ Value NewLabel ] [ str "New" ]
+                  option [ Value AccelerationLabel ] [ str "Acceleration" ] ]
+             ]
+    ]
+  ]
 
 let renderChart title (model : Model) =
   testChartProps
@@ -102,23 +171,24 @@ let dataPart (model : Model) =
                   th [ ] [ str "Hospitalisation" ]
                   th [ ] [ str "Reanimation" ]
                   th [ ] [ str "Return" ]
-                  th [ ] [ str "Death" ]
-                  th [ ] [ str "New Hospitalisation" ]
-                  th [ ] [ str "New Reanimation" ]
-                  th [ ] [ str "New Return" ]
-                  th [ ] [ str "New Death" ] ] ]
+                  th [ ] [ str "Death" ] ] ]
           tbody [ ] [
+              let getterData, getterOption =
+                match model.TableDisplayChoice with
+                  | Nb -> getNbOnDay, None
+                  | New -> getNewOnDay, Some getNewOnDay2
+                  | Acceleration -> getAcceleration, Some getAcceleration2
               for stat in model.CovidStats do
                 tr [ ]
-                  [ td [ ] [ str (stat.Day.ToString("dd/MM/yyyy")) ]
-                    td [ ] [ str (string stat.NbOnDay.Hospitalisation) ]
-                    td [ ] [ str (string stat.NbOnDay.Reanimation) ]
-                    td [ ] [ str (string stat.NbOnDay.Return) ]
-                    td [ ] [ str (string stat.NbOnDay.Death) ]
-                    td [ ] [ str (string stat.NewOnDay.Value.Hospitalisation ) ]
-                    td [ ] [ str (string stat.NewOnDay.Value.Reanimation) ]
-                    td [ ] [ str (string stat.NewOnDay.Value.Return) ]
-                    td [ ] [ str (string stat.NewOnDay.Value.Death) ]  ]
+                  [
+                    td [ ] [ str (stat.Day.ToString("dd/MM/yyyy")) ]
+                    if Option.isNone <| getterOption ||
+                      Option.isSome <| getterOption.Value stat then
+                      td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getHospitalisation) ) ]
+                      td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getReanimation) ) ]
+                      td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getReturn) ) ]
+                      td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getDeath) ) ]
+                  ]
           ]
         ]
     ]
@@ -151,6 +221,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
                     //button [ Id "test"] [ str "asf" ]
                     canvas [ Id "chart-id" ] []
                     //  <canvas id="chart"></canvas>
+                    datarepresentationchoice model dispatch
                     dataPart model
                 ]
             ]

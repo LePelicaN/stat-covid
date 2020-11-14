@@ -7,59 +7,38 @@ open Fable.Remoting.Giraffe
 open Saturn
 
 open Shared
+open Shared.CovidStatHelper
 
 open FSharp.Data
 
 open CsvModel
 
-// type Storage () =
-    //let todos = ResizeArray<_>()
-
-    // member __.GetTodos () =
-    //     List.ofSeq todos
-
-    // member __.AddTodo (todo: Todo) =
-    //     if Todo.isValid todo.Description then
-    //         todos.Add todo
-    //         Ok ()
-    //     else Error "Invalid todo"
-
-// let storage = Storage()
-
-// storage.AddTodo(Todo.create "Create new SAFE project") |> ignore
-// storage.AddTodo(Todo.create "Write your app") |> ignore
-// storage.AddTodo(Todo.create "Ship it !!!") |> ignore
-
 let todosApi = {
-  GetData = fun (county:string, sexe:string) -> async {
+  GetData = fun (county:string, sexe:string, newWindow:int, accelerationWindow:int) -> async {
     try
       let address = "https://www.data.gouv.fr/fr/datasets/r/63352e38-d353-4b54-bfd1-f1b3ee1cabd7"
       let csvData = CsvFile.Load(address, ";")
 
-      let addNew (updatedPrevious:CovidStat list) (currentDay:CovidStat) =
-        let updated =
-          match updatedPrevious with
-            | h::t ->
-              { currentDay with
-                  NewOnDay = Some
-                    {
-                      Hospitalisation = currentDay.NbOnDay.Hospitalisation - h.NbOnDay.Hospitalisation
-                      Reanimation = currentDay.NbOnDay.Reanimation - h.NbOnDay.Reanimation
-                      Return = currentDay.NbOnDay.Return - h.NbOnDay.Return
-                      Death = currentDay.NbOnDay.Death - h.NbOnDay.Death
-                    }
+      let updateStats (updatedPrevious:CovidStat list) (currentDay:CovidStat) =
+        let updatedWithNew =
+          if newWindow > 0 && updatedPrevious.Length >= newWindow then
+            let prevWindow = updatedPrevious.[newWindow - 1]
+            // eprintf "prevWindow: %A" prevWindow
+            // eprintf "currentDay: %A" currentDay
+            { currentDay with
+                NewOnDay = Some <| diffStats getNbOnDay currentDay prevWindow / (float newWindow)
+            }
+          else currentDay
+        let updatedWithAcceleration =
+          if accelerationWindow > 0 && updatedPrevious.Length >= accelerationWindow then
+            let prevWindow = updatedPrevious.[accelerationWindow - 1]
+            if Option.isSome <| getNewOnDay2 prevWindow then
+              { updatedWithNew with
+                  Acceleration = Some <| diffStats getNewOnDay updatedWithNew prevWindow / (float accelerationWindow)
               }
-            | _ ->
-              { currentDay with
-                  NewOnDay = Some
-                    {
-                      Hospitalisation = currentDay.NbOnDay.Hospitalisation
-                      Reanimation = currentDay.NbOnDay.Reanimation
-                      Return = currentDay.NbOnDay.Return
-                      Death = currentDay.NbOnDay.Death
-                    }
-              }
-        updated :: updatedPrevious
+            else updatedWithNew
+          else updatedWithNew
+        updatedWithAcceleration :: updatedPrevious
 
       return csvData.Rows
       |> Seq.filter (fun row ->
@@ -80,7 +59,7 @@ let todosApi = {
           Acceleration = Option.None
         }
       )
-      |> Seq.fold addNew []
+      |> Seq.fold updateStats []
       |> List.rev
 
     with
