@@ -1,6 +1,7 @@
 module Index
 
 open Elmish
+open Fable.Import.Chartjs
 open Fable.Remoting.Client
 open Shared
 
@@ -83,24 +84,35 @@ let containerBox (model : Model) (dispatch : Msg -> unit) =
         ]
     ]
 
+let renderChart title (model : Model) =
+  testChartProps
+
 let dataPart (model : Model) =
-  Table.table [ Table.IsHoverable ]
-    [ thead [ ]
-        [ tr [ ]
-            [ th [ ] [ str "Date" ]
-              th [ ] [ str "Hospitalisation" ]
-              th [ ] [ str "Reanimation" ]
-              th [ ] [ str "Return" ]
-              th [ ] [ str "Death" ] ] ]
-      tbody [ ] [
-          for stat in model.CovidStats do
-            tr [ ]
-              [ td [ ] [ str (stat.Day.ToString("dd/MM/yyyy")) ]
-                td [ ] [ str (string stat.NbHospitalisation) ]
-                td [ ] [ str (string stat.NbReanimation) ]
-                td [ ] [ str (string stat.NbReturn) ]
-                td [ ] [ str (string stat.NbDeath) ] ]
-      ]
+  Container.container [
+    Container.IsFluid
+    Container.Modifiers [ Modifier.BackgroundColor IsGreyLighter ]
+  ]
+    [ 
+      renderChart "test" model
+
+      Table.table [ Table.IsHoverable ]
+        [ thead [ ]
+            [ tr [ ]
+                [ th [ ] [ str "Date" ]
+                  th [ ] [ str "Hospitalisation" ]
+                  th [ ] [ str "Reanimation" ]
+                  th [ ] [ str "Return" ]
+                  th [ ] [ str "Death" ] ] ]
+          tbody [ ] [
+              for stat in model.CovidStats do
+                tr [ ]
+                  [ td [ ] [ str (stat.Day.ToString("dd/MM/yyyy")) ]
+                    td [ ] [ str (string stat.NbHospitalisation) ]
+                    td [ ] [ str (string stat.NbReanimation) ]
+                    td [ ] [ str (string stat.NbReturn) ]
+                    td [ ] [ str (string stat.NbDeath) ] ]
+          ]
+        ]
     ]
 
 let view (model : Model) (dispatch : Msg -> unit) =
@@ -128,8 +140,12 @@ let view (model : Model) (dispatch : Msg -> unit) =
                 ] [
                     Heading.p [ Heading.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [ str "Statistic COVID" ]
                     containerBox model dispatch
+                    //button [ Id "test"] [ str "asf" ]
+                    canvas [ Id "chart-id" ] []
+                    //  <canvas id="chart"></canvas>
                     dataPart model
                 ]
             ]
         ]
     ]
+    
