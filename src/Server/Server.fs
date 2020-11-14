@@ -35,31 +35,29 @@ let todosApi = {
     try
       let address = "https://www.data.gouv.fr/fr/datasets/r/63352e38-d353-4b54-bfd1-f1b3ee1cabd7"
       let csvData = CsvFile.Load(address, ";")
-      eprintfn "csvData: %A" csvData
-      eprintfn "csvData.Headers: %A" csvData.Headers
-
-      let firstRow = csvData.Rows |> Seq.head
-      eprintfn "1st row: %A" firstRow
-      eprintfn "1st row dep: %A" (firstRow.GetColumn "dep")
-      eprintfn "1st row jour: %A" (firstRow.GetColumn "jour")
-
 
       let addNew (updatedPrevious:CovidStat list) (currentDay:CovidStat) =
         let updated =
           match updatedPrevious with
             | h::t ->
               { currentDay with
-                  NewHospitalisation = currentDay.NbHospitalisation - h.NbHospitalisation
-                  NewReanimation = currentDay.NbReanimation - h.NbReanimation
-                  NewReturn = currentDay.NbReturn - h.NbReturn
-                  NewDeath = currentDay.NewDeath - h.NewDeath
+                  NewOnDay = Some
+                    {
+                      Hospitalisation = currentDay.NbOnDay.Hospitalisation - h.NbOnDay.Hospitalisation
+                      Reanimation = currentDay.NbOnDay.Reanimation - h.NbOnDay.Reanimation
+                      Return = currentDay.NbOnDay.Return - h.NbOnDay.Return
+                      Death = currentDay.NbOnDay.Death - h.NbOnDay.Death
+                    }
               }
             | _ ->
               { currentDay with
-                  NewHospitalisation = currentDay.NbHospitalisation
-                  NewReanimation = currentDay.NbReanimation
-                  NewReturn = currentDay.NbReturn
-                  NewDeath = currentDay.NewDeath
+                  NewOnDay = Some
+                    {
+                      Hospitalisation = currentDay.NbOnDay.Hospitalisation
+                      Reanimation = currentDay.NbOnDay.Reanimation
+                      Return = currentDay.NbOnDay.Return
+                      Death = currentDay.NbOnDay.Death
+                    }
               }
         updated :: updatedPrevious
 
@@ -71,14 +69,15 @@ let todosApi = {
       |> Seq.map (fun row -> 
         {
           Day = DateTime.ParseExact((row.GetColumn CsvModel.dateLabel), CsvModel.dateFormats, null, System.Globalization.DateTimeStyles.None)
-          NbHospitalisation = int (row.GetColumn CsvModel.nbHostitalisationLabel)
-          NewHospitalisation = 0
-          NbReanimation = int (row.GetColumn CsvModel.nbReanimationLabel)
-          NewReanimation = 0
-          NbReturn = int (row.GetColumn CsvModel.nbReturnLabel)
-          NewReturn = 0
-          NbDeath = int (row.GetColumn CsvModel.nbDeathLabel)
-          NewDeath = 0
+          NbOnDay =
+            {
+              Hospitalisation = float (row.GetColumn CsvModel.nbHostitalisationLabel)
+              Reanimation = float (row.GetColumn CsvModel.nbReanimationLabel)
+              Return = float (row.GetColumn CsvModel.nbReturnLabel)
+              Death = float (row.GetColumn CsvModel.nbDeathLabel)
+            }
+          NewOnDay = Option.None
+          Acceleration = Option.None
         }
       )
       |> Seq.fold addNew []

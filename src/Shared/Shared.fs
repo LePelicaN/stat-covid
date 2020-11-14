@@ -2,16 +2,17 @@ namespace Shared
 
 open System
 
+type Stat =
+  { Hospitalisation : float
+    Reanimation : float
+    Return : float
+    Death : float }
+
 type CovidStat =
-    { Day : DateTime
-      NbHospitalisation : int
-      NewHospitalisation : int
-      NbReanimation : int
-      NewReanimation : int
-      NbReturn : int
-      NewReturn : int
-      NbDeath : int
-      NewDeath : int }
+  { Day : DateTime
+    NbOnDay : Stat
+    NewOnDay : Stat option
+    Acceleration : Stat option}
 
 // module CovidStat =
 //     let isValid (description: string) =
