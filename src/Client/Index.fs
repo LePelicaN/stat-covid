@@ -27,7 +27,8 @@ type Model =
       Sex: string
       NewWindow: int
       AccelerationWindow: int
-      TableDisplayChoice: DisplayChoice }
+      TableDisplayChoice: DisplayChoice
+      ShowNullValues: bool }
 
 type Msg =
     | GotCovidStat of CovidStat list
@@ -36,6 +37,7 @@ type Msg =
     | SetNewWindow of string
     | SetAccelerationWindow of string
     | SetTableDisplayChoice of string
+    | ChangeShowNullValues
     | Refresh
 
 let covidStatApi =
@@ -53,7 +55,8 @@ let init(): Model * Cmd<Msg> =
           Sex = "0"
           NewWindow = 7
           AccelerationWindow = 3
-          TableDisplayChoice = Nb }
+          TableDisplayChoice = Nb
+          ShowNullValues = false }
     model, synchroCmd model
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
@@ -70,6 +73,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
       { model with AccelerationWindow = int(value) }, Cmd.none
     | SetTableDisplayChoice value ->
       { model with TableDisplayChoice = parseDisplayChoice(value) }, Cmd.none
+    | ChangeShowNullValues ->
+      { model with ShowNullValues = not model.ShowNullValues }, Cmd.none
     | Refresh ->
       model, synchroCmd model
 
@@ -139,58 +144,77 @@ let containerBox (model : Model) (dispatch : Msg -> unit) =
         ]
     ]
 
-let datarepresentationchoice (model : Model) (dispatch : Msg -> unit) =
-  Box.box' [ ] [
-    Field.div [ ] [
-      Select.select [ ]
-            [ select
-                [ DefaultValue "Number"
-                  OnChange (fun x -> SetTableDisplayChoice x.Value |> dispatch) ]
-                [ option [ Value NbLabel ] [ str "Number" ]
-                  option [ Value NewLabel ] [ str "New" ]
-                  option [ Value AccelerationLabel ] [ str "Acceleration" ] ]
-             ]
+let datafilter (model : Model) (dispatch : Msg -> unit) =
+  Container.container [ ]
+    [
+      Button.a [
+          Button.Color IsPrimary
+          Button.IsActive model.ShowNullValues
+          Button.OnClick (fun _ -> ChangeShowNullValues |> dispatch)
+      ] [
+          str "Show line with no values"
+      ]
+      Select.select [ ] [
+        select [
+          DefaultValue "Number"
+          OnChange (fun x -> SetTableDisplayChoice x.Value |> dispatch)
+        ] [
+          option [ Value NbLabel ] [ str "Number" ]
+          option [ Value NewLabel ] [ str "New" ]
+          option [ Value AccelerationLabel ] [ str "Acceleration" ] ] ]
     ]
-  ]
 
 let renderChart title (model : Model) =
   testChartProps
 
-let dataPart (model : Model) =
+let dataPart (model : Model) (dispatch : Msg -> unit) =
   Container.container [
     Container.IsFluid
     Container.Modifiers [ Modifier.BackgroundColor IsGreyLighter ]
   ]
-    [ 
+    [
+      datafilter model dispatch
       renderChart "test" model
-
       Table.table [ Table.IsHoverable ]
-        [ thead [ ]
-            [ tr [ ]
-                [ th [ ] [ str "Date" ]
-                  th [ ] [ str "Hospitalisation" ]
-                  th [ ] [ str "Reanimation" ]
-                  th [ ] [ str "Return" ]
-                  th [ ] [ str "Death" ] ] ]
-          tbody [ ] [
-              let getterData, getterOption =
-                match model.TableDisplayChoice with
-                  | Nb -> getNbOnDay, None
-                  | New -> getNewOnDay, Some getNewOnDay2
-                  | Acceleration -> getAcceleration, Some getAcceleration2
-              for stat in model.CovidStats do
-                tr [ ]
-                  [
-                    td [ ] [ str (stat.Day.ToString("dd/MM/yyyy")) ]
-                    if Option.isNone <| getterOption ||
-                      Option.isSome <| getterOption.Value stat then
-                      td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getHospitalisation) ) ]
-                      td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getReanimation) ) ]
-                      td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getReturn) ) ]
-                      td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getDeath) ) ]
-                  ]
+          [ thead [ Style [
+                  Display DisplayOptions.Table
+                  TableLayout "fixed"
+                  Width "100%"
+                   ] ]
+              [ tr [ ]
+                  [ th [ ] [ str "Date" ]
+                    th [ ] [ str "Hospitalisation" ]
+                    th [ ] [ str "Reanimation" ]
+                    th [ ] [ str "Return" ]
+                    th [ ] [ str "Death" ] ] ]
+            tbody [ Style [
+                    Display DisplayOptions.Block
+                    Height "500px"
+                    OverflowY OverflowOptions.Auto
+                     ] ] [
+                let getterData, getterOption =
+                  match model.TableDisplayChoice with
+                    | Nb -> getNbOnDay, None
+                    | New -> getNewOnDay, Some getNewOnDay2
+                    | Acceleration -> getAcceleration, Some getAcceleration2
+                for stat in model.CovidStats do
+                  tr [ Style [
+                        Display DisplayOptions.Table
+                        TableLayout "fixed"
+                        Width "100%"
+                         ] ]
+                    [
+                      let isDataValid = Option.isNone <| getterOption || Option.isSome <| getterOption.Value stat
+                      if isDataValid || model.ShowNullValues then
+                        td [ ] [ str (stat.Day.ToString("dd/MM/yyyy")) ]
+                        if isDataValid then
+                          td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getHospitalisation) ) ]
+                          td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getReanimation) ) ]
+                          td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getReturn) ) ]
+                          td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getDeath) ) ]
+                    ]
+            ]
           ]
-        ]
     ]
 
 let view (model : Model) (dispatch : Msg -> unit) =
@@ -221,8 +245,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
                     //button [ Id "test"] [ str "asf" ]
                     canvas [ Id "chart-id" ] []
                     //  <canvas id="chart"></canvas>
-                    datarepresentationchoice model dispatch
-                    dataPart model
+                    dataPart model dispatch
                 ]
             ]
         ]
