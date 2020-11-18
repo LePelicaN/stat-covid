@@ -8,7 +8,8 @@ open Fable.React
 type DatasetProps =
   | Label of string
   // TODO: change to obj ?
-  | Data of int array
+  | Data of float array
+  | Base of int
   // TODO: proposer la creation du rgba... ?
   | BackgroundColor of string array
   // TODO: proposer la creation du rgba... ?
@@ -33,12 +34,35 @@ type TicksProps =
   | BeginAtZero of bool
 
 [<RequireQualifiedAccess>]
+type DisplayFormatsProps =
+  | Quarter of string
+
+[<RequireQualifiedAccess>]
+type TimeProps =
+  static member DisplayFormats (displayFormats : DisplayFormatsProps seq) : TimeProps =
+    unbox ("displayFormats", keyValueList CaseRules.LowerFirst displayFormats)
+
+[<RequireQualifiedAccess>]
 type AxesProps =
+  | Type of string
+
   static member Ticks (ticks : TicksProps seq) : AxesProps =
     unbox ("ticks", keyValueList CaseRules.LowerFirst ticks)
 
+  static member Time (time : TimeProps seq) : AxesProps =
+    unbox ("time", keyValueList CaseRules.LowerFirst time)
+
 [<RequireQualifiedAccess>]
 type ScalesProps =
+  static member XAxes (xAxesList : (AxesProps seq) array) : ScalesProps =
+    let xAxes =
+      xAxesList
+      |> Array.map (fun v ->
+        keyValueList CaseRules.LowerFirst v // Transform the list of props into a JavaScript object
+      )
+
+    unbox ("xAxes", xAxes)
+
   static member YAxes (yAxesList : (AxesProps seq) array) : ScalesProps =
     let yAxes =
       yAxesList
@@ -61,8 +85,14 @@ type ChartProps =
   static member Options (options : OptionsProps seq) : ChartProps =
       unbox ("options", keyValueList CaseRules.LowerFirst options)
 
+let inline processItem (mainType: string) (props: ChartProps list) : ReactElement =
+  ofImport mainType "../../node_modules/react-chartjs-2/dist/react-chartjs-2.js" (keyValueList CaseRules.LowerFirst props) []
+
 let inline processBar (props: ChartProps list) : ReactElement =
-  ofImport "Bar" "../../node_modules/react-chartjs-2/dist/react-chartjs-2.js" (keyValueList CaseRules.LowerFirst props) []
+  processItem "Bar" props
+
+let inline processLine (props: ChartProps list) : ReactElement =
+  processItem "Line" props
 
 let testChartProps =
    processBar
@@ -74,7 +104,7 @@ let testChartProps =
             [|
               [
                 DatasetProps.Label "# of Votes"
-                DatasetProps.Data [| 12; 19; 3; 5; 2; 3 |]
+                DatasetProps.Data [| 12.; 19.; 3.; 5.; 2.; 3. |]
                 DatasetProps.BackgroundColor
                   [|
                     "rgba(255, 99, 132, 0.2)";

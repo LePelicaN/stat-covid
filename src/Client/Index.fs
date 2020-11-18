@@ -85,12 +85,12 @@ open Fulma
 let navBrand =
     Navbar.Brand.div [ ] [
         Navbar.Item.a [
-            Navbar.Item.Props [ Href "https://safe-stack.github.io/" ]
+            Navbar.Item.Props [ Href "https://github.com/LePelicaN/stat-covid" ]
             Navbar.Item.IsActive true
         ] [
             img [
-                Src "/favicon.png"
-                Alt "Logo"
+                Src "/favicon.ico"
+                Alt "Github"
             ]
         ]
     ]
@@ -164,8 +164,64 @@ let datafilter (model : Model) (dispatch : Msg -> unit) =
           option [ Value AccelerationLabel ] [ str "Acceleration" ] ] ]
     ]
 
-let renderChart title (model : Model) =
-  testChartProps
+let getterAndvalidator (tableDisplayChoice : DisplayChoice) =
+  match tableDisplayChoice with
+    | Nb -> getNbOnDay, None
+    | New -> getNewOnDay, Some getNewOnDay2
+    | Acceleration -> getAcceleration, Some getAcceleration2
+
+let isDataValid getterData getterOption stat =
+  Option.isNone <| getterOption || Option.isSome <| getterOption.Value stat
+
+let renderChart (model : Model) =
+
+  let getterData, getterOption = getterAndvalidator model.TableDisplayChoice
+
+  let labels =
+    model.CovidStats
+    |> List.filter (isDataValid getterData getterOption)
+    |> List.map (fun stat -> stat.Day.ToString("dd-MMM-yy"))
+    |> List.toArray
+  let getValues getter =
+    model.CovidStats
+    |> List.filter (isDataValid getterData getterOption)
+    |> List.map getter
+    |> List.toArray
+
+  processLine
+      [
+        ChartProps.Data
+          [
+            DataProps.Labels labels
+            DataProps.Datasets
+              [|
+                [
+                  DatasetProps.Label "Return"
+                  DatasetProps.Data <| getValues (getterData >> getReturn)
+                  DatasetProps.BackgroundColor [| "#30336b" |]
+                  DatasetProps.BorderColor [| "#130f40" |]
+                ]
+                [
+                  DatasetProps.Label "Hospitalisation"
+                  DatasetProps.Data <| getValues (getterData >> getHospitalisation)
+                  DatasetProps.BackgroundColor [| "#f6e58d" |]
+                  DatasetProps.BorderColor [| "#f9ca24" |]
+                ]
+                [
+                  DatasetProps.Label "Reanimation"
+                  DatasetProps.Data <| getValues (getterData >> getReanimation)
+                  DatasetProps.BackgroundColor [| "#ffbe76" |]
+                  DatasetProps.BorderColor [| "#f0932b" |]
+                ]
+                [
+                  DatasetProps.Label "Death"
+                  DatasetProps.Data <| getValues (getterData >> getDeath)
+                  DatasetProps.BackgroundColor [| "#badc58" |]
+                  DatasetProps.BorderColor [| "#6ab04c" |]
+                ]
+              |]
+          ]
+      ]
 
 let dataPart (model : Model) (dispatch : Msg -> unit) =
   Container.container [
@@ -174,7 +230,8 @@ let dataPart (model : Model) (dispatch : Msg -> unit) =
   ]
     [
       datafilter model dispatch
-      renderChart "test" model
+      if not <| List.isEmpty model.CovidStats then
+        renderChart model
       Table.table [ Table.IsHoverable ]
           [ thead [ Style [
                   Display DisplayOptions.Table
@@ -192,11 +249,7 @@ let dataPart (model : Model) (dispatch : Msg -> unit) =
                     Height "500px"
                     OverflowY OverflowOptions.Auto
                      ] ] [
-                let getterData, getterOption =
-                  match model.TableDisplayChoice with
-                    | Nb -> getNbOnDay, None
-                    | New -> getNewOnDay, Some getNewOnDay2
-                    | Acceleration -> getAcceleration, Some getAcceleration2
+                let getterData, getterOption = getterAndvalidator model.TableDisplayChoice
                 for stat in model.CovidStats do
                   tr [ Style [
                         Display DisplayOptions.Table
@@ -204,10 +257,10 @@ let dataPart (model : Model) (dispatch : Msg -> unit) =
                         Width "100%"
                          ] ]
                     [
-                      let isDataValid = Option.isNone <| getterOption || Option.isSome <| getterOption.Value stat
-                      if isDataValid || model.ShowNullValues then
+                      let dataValid = isDataValid getterData getterOption stat
+                      if dataValid || model.ShowNullValues then
                         td [ ] [ str (stat.Day.ToString("dd/MM/yyyy")) ]
-                        if isDataValid then
+                        if dataValid then
                           td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getHospitalisation) ) ]
                           td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getReanimation) ) ]
                           td [ ] [ str (sprintf "%.2f" (stat |> getterData |> getReturn) ) ]
@@ -250,4 +303,4 @@ let view (model : Model) (dispatch : Msg -> unit) =
             ]
         ]
     ]
-    
+
