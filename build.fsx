@@ -49,7 +49,7 @@ Target.create "Bundle" (fun _ ->
 
 Target.create "Azure" (fun _ ->
     let web = webApp {
-        name "stat_covid"
+        name "stat-covid"
         zip_deploy "deploy"
     }
     let deployment = arm {
@@ -58,7 +58,7 @@ Target.create "Azure" (fun _ ->
     }
 
     deployment
-    |> Deploy.execute "stat_covid" Deploy.NoParameters
+    |> Deploy.execute "stat-covid" Deploy.NoParameters
     |> ignore
 )
 
